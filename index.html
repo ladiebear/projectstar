@@ -119,7 +119,7 @@
         ) {
           star.settled = true;
           star.el.textContent = "★";
-          // Set star size with a small variation: between 0.9rem and 1.0rem.
+          // Set star size with a small variation: between 0.4rem and 0.5rem.
           const newFontSize = (0.4 + Math.random() * 0.1).toFixed(2) + "rem";
           star.el.style.fontSize = newFontSize;
           
@@ -245,7 +245,7 @@
       userText.innerText = "";
     }
     
-    // Disperse text every 5 seconds.
+    // Disperse text every 10 seconds.
     setInterval(disperseText, 10000);
     
     // Also disperse text immediately if it overflows (for fast typers).
@@ -253,6 +253,18 @@
     userTextElem.addEventListener("input", function() {
       if (userTextElem.scrollWidth > userTextElem.clientWidth) {
         disperseText();
+      }
+    });
+    
+    // Disperse text if the user presses Enter or types a period.
+    userTextElem.addEventListener("keydown", function(e) {
+      if(e.key === "Enter") {
+        // Prevent newline insertion in a single-line box.
+        e.preventDefault();
+        disperseText();
+      } else if(e.key === ".") {
+        // Use a timeout to allow the period to appear before dispersing.
+        setTimeout(disperseText, 0);
       }
     });
   </script>
