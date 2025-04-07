@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Starry Text Disperse – Refined</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: 'Georgia', serif;
+      position: relative;
+      height: 100vh;
+      color: white;
+    }
+    /* Starry background */
+    .stars-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('https://www.transparenttextures.com/patterns/stardust.png') repeat;
+      opacity: 0.8;
+      z-index: -1;
+    }
+    /* Container for header and text box */
+    #container {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 80vw;
+      max-width: 600px;
+      text-align: center;
+      z-index: 15;
+    }
+    /* Header above the text box */
+    #header {
+      font-size: 2rem;
+      color: white;
+      text-shadow: 0 0 10px #fff;
+      margin-bottom: 10px;
+    }
+    /* Single-line contenteditable text box */
+    #userText {
+      width: 100%;
+      height: 2em;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid #555;
+      padding: 5px 10px;
+      font-size: 1.2rem;
+      border-radius: 8px;
+      box-sizing: border-box;
+      outline: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-align: left;
+    }
+    /* Overlay for moving letters/stars */
+    #animationOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    /* Style for each letter/star */
+    .letter {
+      position: absolute;
+      font-size: 1.2rem;
+      text-shadow: 0 0 5px #fff;
+      pointer-events: none;
+      user-select: none;
+      transition: opacity 0.5s;
+    }
+  </style>
+</head>
+<body>
+  <div class="stars-bg"></div>
+  
+  <!-- Container for header and text box -->
+  <div id="container">
+    <div id="header">Speak to your heavens, and they shall answer you...</div>
+    <div id="userText" contenteditable="true" placeholder="Type your text here..."></div>
+  </div>
+  
+  <div id="animationOverlay"></div>
+  
+  <script>
+    const stars = [];
+    let lastTimestamp = null;
+    // Slower speed: 0.02 pixels per millisecond (~20 px/s)
+    const initialSpeed = 0.02;
+    
+    function animateStars(timestamp) {
+      if (lastTimestamp === null) lastTimestamp = timestamp;
+      const delta = timestamp - lastTimestamp;
+      
+      const userText = document.getElementById("userText");
+      const textRect = userText.getBoundingClientRect();
+      const header = document.getElementById("header");
+      const headerRect = header.getBoundingClientRect();
+      const container = document.getElementById("container");
+      const containerRect = container.getBoundingClientRect();
+      
+      for (let i = 0; i < stars.length; i++) {
+        const star = stars[i];
+        
+        // Transform the letter into a star once it exits the text box.
+        if (!star.settled && (
+            star.x < textRect.left ||
+            star.x > textRect.right ||
+            star.y < textRect.top  ||
+            star.y > textRect.bottom)
+        ) {
+          star.settled = true;
+          star.el.textContent = "★";
+          // Set star size with a small variation: between 0.9rem and 1.0rem.
+          const newFontSize = (0.4 + Math.random() * 0.1).toFixed(2) + "rem";
+          star.el.style.fontSize = newFontSize;
+          
+          // Generate a random target anywhere on the screen, but reselect if it lies within the header.
+          const starWidth = star.el.offsetWidth;
+          const starHeight = star.el.offsetHeight;
+          let targetX, targetY;
+          do {
+            targetX = Math.random() * (window.innerWidth - starWidth);
+            targetY = Math.random() * (window.innerHeight - starHeight);
+          } while (
+            targetX >= headerRect.left && targetX <= headerRect.right &&
+            targetY >= headerRect.top  && targetY <= headerRect.bottom
+          );
+          star.targetX = targetX;
+          star.targetY = targetY;
+          
+          // Recalculate velocity toward the target using the same constant speed.
+          const dx = star.targetX - star.x;
+          const dy = star.targetY - star.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          star.vx = (dx / dist) * initialSpeed;
+          star.vy = (dy / dist) * initialSpeed;
+          
+          // If the target falls within the text box area, mark it for super transparency.
+          if (
+            star.targetX >= textRect.left &&
+            star.targetX <= textRect.right &&
+            star.targetY >= textRect.top &&
+            star.targetY <= textRect.bottom
+          ) {
+            star.superTransparent = true;
+          }
+          star.el.style.opacity = star.superTransparent ? 0.2 : 0.6;
+        }
+        
+        // Update star position.
+        star.x += star.vx * delta;
+        star.y += star.vy * delta;
+        star.el.style.left = star.x + "px";
+        star.el.style.top = star.y + "px";
+        
+        // If the star is settled and nearly at its target, snap it into place.
+        if (star.settled && !star.reachedTarget) {
+          const dxTarget = star.targetX - star.x;
+          const dyTarget = star.targetY - star.y;
+          const distance = Math.sqrt(dxTarget * dxTarget + dyTarget * dyTarget);
+          if (distance < initialSpeed * delta * 2) {
+            star.x = star.targetX;
+            star.y = star.targetY;
+            star.vx = 0;
+            star.vy = 0;
+            star.reachedTarget = true;
+            star.el.style.left = star.x + "px";
+            star.el.style.top = star.y + "px";
+          }
+        }
+      }
+      
+      lastTimestamp = timestamp;
+      requestAnimationFrame(animateStars);
+    }
+    requestAnimationFrame(animateStars);
+    
+    // Create an animated object (letter) at a given starting position.
+    function createStar(letter, startX, startY) {
+      const overlay = document.getElementById("animationOverlay");
+      const span = document.createElement("span");
+      span.classList.add("letter");
+      span.style.left = startX + "px";
+      span.style.top = startY + "px";
+      // Initially display the original letter.
+      span.textContent = letter;
+      overlay.appendChild(span);
+      
+      // Assign an initial random velocity using the constant speed.
+      const vx = Math.random() * (initialSpeed * 2) - initialSpeed;
+      const vy = Math.random() * (initialSpeed * 2) - initialSpeed;
+      
+      stars.push({
+        el: span,
+        x: startX,
+        y: startY,
+        vx: vx,
+        vy: vy,
+        settled: false,
+        reachedTarget: false,
+        superTransparent: false
+      });
+    }
+    
+    // Disperse text by measuring each character’s on-screen position.
+    function disperseText() {
+      const userText = document.getElementById("userText");
+      if (!userText.firstChild) return;
+      
+      const walker = document.createTreeWalker(
+        userText,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+      let textNode = walker.nextNode();
+      if (!textNode) return;
+      
+      const textContent = userText.innerText;
+      for (let i = 0; i < textContent.length; i++) {
+        const char = textContent[i];
+        if (char.trim() === "") continue;
+        const range = document.createRange();
+        range.setStart(textNode, i);
+        range.setEnd(textNode, i + 1);
+        const rects = range.getClientRects();
+        if (rects.length > 0) {
+          const rect = rects[0];
+          createStar(char, rect.left, rect.top);
+        } else {
+          const box = userText.getBoundingClientRect();
+          createStar(char, box.left, box.top);
+        }
+      }
+      // Clear the text box for new input.
+      userText.innerText = "";
+    }
+    
+    // Disperse text every 5 seconds.
+    setInterval(disperseText, 5000);
+    
+    // Also disperse text immediately if it overflows (for fast typers).
+    const userTextElem = document.getElementById("userText");
+    userTextElem.addEventListener("input", function() {
+      if (userTextElem.scrollWidth > userTextElem.clientWidth) {
+        disperseText();
+      }
+    });
+  </script>
+</body>
+</html>
